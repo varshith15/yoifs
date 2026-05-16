@@ -25,13 +25,25 @@ The project consists of several key components:
 - **`CorruptionSimulator`**: Introduces controlled corruption for testing
 - **`TestHarness`**: Comprehensive test suite with three levels of testing
 
-## Design (this implementation — v1)
+## Design (this implementation — v2)
 
-This implementation ships **Levels 1 + 2**: full file operations and reliable corruption *detection* via two-layer CRC32 checksums. Level 3 (recovery via replication / erasure coding) is intentionally deferred to v2.
+This implementation ships all three levels of the assignment:
 
-The full architectural rationale — disk layout, FAT format, checksum strategy, allocation policy, edge-case handling, and the v2 migration path — lives in **[`DESIGN.md`](./DESIGN.md)**. Every non-trivial choice in `solution.ts` cites the section there.
+- **Levels 1 + 2 (v1 foundation):** full file operations and corruption *detection* via two-layer CRC32 checksums. Never silently returns wrong data.
+- **Level 3 (v2 layer):** corruption *recovery* via 4-way zoned replication, byte-wise plurality voting, and automatic self-healing on read.
 
-v1 result against the test harness: 100% fault tolerance rate (successful + detected) at every corruption rate from 0.01% through 10%, with **zero** silent data integrity failures.
+The full architectural rationale — zoned disk layout, FAT replication, byte-vote math, fast/slow read paths, self-healing semantics, and the v3 (Reed-Solomon) migration path — lives in **[`DESIGN.md`](./DESIGN.md)**. Every non-trivial choice in `solution.ts` cites the section there.
+
+**Measured results against the test harness (3-run average):**
+
+| Corruption rate | v1 (detection-only) | v2 (this implementation) |
+|---|---|---|
+| 0.01% – 1% | 84% – 100% successful reads | **~100% successful reads** |
+| 5% | ~2% successful reads | **~94% successful reads** |
+| 10% | ~1% successful reads | **~55% successful reads** |
+| Data integrity failures (silent corruption) | **0 at every rate** | **0 at every rate** |
+
+The v1 invariant — zero silent data integrity failures — is preserved deterministically under v2. v2 trades some `detectedCorruptions` for actual `successfulReads` at every rate. For pushing through 10%+ corruption with similar overhead, v3 (Reed-Solomon over the same zoned chunks) is the next step — see DESIGN.md §15.
 
 ## Implementation Levels
 
